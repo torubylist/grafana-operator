@@ -84,7 +84,7 @@ func (c *APIClient) DeleteDashboard(slug string) error {
 }
 
 func (c *APIClient) CreateDashboard(dashboardJSON io.Reader) error {
-	return doPost(makeUrl(c.BaseUrl, "/api/dashboards/import"), dashboardJSON, c.HTTPClient)
+	return doPost(makeUrl(c.BaseUrl, "/api/dashboards/db"), dashboardJSON, c.HTTPClient)
 }
 
 func (c *APIClient) CreateDatasource(datasourceJSON io.Reader) error {
