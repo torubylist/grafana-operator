@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"log"
 )
 
 type APIInterface interface {
@@ -84,10 +85,12 @@ func (c *APIClient) DeleteDashboard(slug string) error {
 }
 
 func (c *APIClient) CreateDashboard(dashboardJSON io.Reader) error {
+	log.Println(fmt.Sprintf("Failed to create %s, %s", c.BaseUrl, "/api/dashboards/db"))
 	return doPost(makeUrl(c.BaseUrl, "/api/dashboards/db"), dashboardJSON, c.HTTPClient)
 }
 
 func (c *APIClient) CreateDatasource(datasourceJSON io.Reader) error {
+	log.Println(fmt.Sprintf("Failed to create %s, %s", c.BaseUrl, "/api/datasources"))
 	return doPost(makeUrl(c.BaseUrl, "/api/datasources"), datasourceJSON, c.HTTPClient)
 }
 

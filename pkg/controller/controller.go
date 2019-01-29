@@ -89,7 +89,7 @@ func (c *ConfigMapController) CreateDashboards(obj interface{}) {
 			}
 
 			if err != nil {
-				log.Println(fmt.Sprintf("Failed to create %s", k))
+				log.Println(fmt.Sprintf("Failed to create %s, %s", err, k))
 			} else {
 				log.Println(fmt.Sprintf("Created %s", k))
 			}
