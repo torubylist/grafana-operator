@@ -42,7 +42,7 @@ node('tos-builder') {
                         mkdir -p $GOPATH/src/github.com/tsloughter/grafana-operator
                         cp -r . $GOPATH/src/github.com/tsloughter/grafana-operator
                         cd $GOPATH/src/github.com/tsloughter/grafana-operator
-                        go build -v -i -o ./bin/grafana-dashboard-operator ./cmd
+                        CGO_ENABLED=0  go build -v -i -o ./bin/grafana-dashboard-operator ./cmd
                     """
                 }
                 stage('ci build') {

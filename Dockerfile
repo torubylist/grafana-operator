@@ -7,4 +7,5 @@ USER kube-operator
 
 COPY ./bin/grafana-dashboard-operator .
 
+
 ENTRYPOINT ["./grafana-dashboard-operator"]
