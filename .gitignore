@@ -1,6 +1,4 @@
-vendor
-bin
-
+vendor/**/.git
 # Binaries for programs and plugins
 *.exe
 *.dll
