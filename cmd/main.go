@@ -43,7 +43,6 @@ func main() {
 	if os.Getenv("GRAFANA_USER") != "" && os.Getenv("GRAFANA_PASSWORD") != "" {
 		gUrl.User = url.UserPassword(os.Getenv("GRAFANA_USER"), os.Getenv("GRAFANA_PASSWORD"))
 	}
-
 	g := grafana.New(gUrl)
 
 	sigs := make(chan os.Signal, 1) // Create channel to receive OS signals

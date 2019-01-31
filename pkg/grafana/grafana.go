@@ -24,6 +24,8 @@ import (
 	"path"
 	"strings"
 	"log"
+	"time"
+	"github.com/pkg/errors"
 )
 
 type APIInterface interface {
@@ -31,6 +33,7 @@ type APIInterface interface {
 	CreateDashboard(dashboardJson io.Reader) error
 	DeleteDashboard(slug string) error
 	CreateDatasource(datasourceJson io.Reader) error
+	WaitForGrafanaUp() error
 }
 
 type APIClient struct {
@@ -106,6 +109,29 @@ func doPost(url string, dataJSON io.Reader, c *http.Client) error {
 	}
 
 	return doRequest(c, req)
+}
+
+func (c *APIClient)WaitForGrafanaUp() error {
+	grafanaHealthUrl := fmt.Sprintf("%s/api/health", c.BaseUrl)
+	for {
+		resp, err := http.Get(grafanaHealthUrl)
+		grafanaUp := false
+		if err != nil {
+			log.Printf("Failed to request Grafana Health: %s", err)
+		} else if resp.StatusCode != 200 {
+			log.Printf("Grafana Health returned with %d", resp.StatusCode)
+		} else {
+			grafanaUp = true
+		}
+
+		if grafanaUp {
+			return nil
+		} else {
+			log.Println("Trying Grafana Health again in 60s")
+			time.Sleep(60 * time.Second)
+		}
+	}
+	return errors.New("grafana is not ready")
 }
 
 func doRequest(c *http.Client, req *http.Request) error {
