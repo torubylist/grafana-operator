@@ -25,7 +25,7 @@ import (
 	"strings"
 	"log"
 	"time"
-	"github.com/pkg/errors"
+	"errors"
 )
 
 type APIInterface interface {
