@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+    "github.com/tidwall/sjson"
 )
 
 // ConfigMapController watches the kubernetes api for changes to configmaps and
@@ -34,6 +35,7 @@ func (c *ConfigMapController) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	wg.Add(1)
 
 	// Execute go function
+
 	go c.configmapInformer.Run(stopCh)
 
 	// Wait till we receive a stop signal
@@ -74,8 +76,19 @@ func (c *ConfigMapController) CreateDashboards(obj interface{}) {
 	configmapObj := obj.(*v1.ConfigMap)
 	dh, _ := configmapObj.Annotations["grafana.net/dashboards"]
 	ds, _ := configmapObj.Annotations["grafana.net/datasource"]
+	fd, _ := configmapObj.Annotations["grafana.net/folder"]
 	isGrafanaDashboards, _ := strconv.ParseBool(dh)
 	isGrafanaDatasource, _ := strconv.ParseBool(ds)
+	var folderid int
+	if isGrafanaDashboards && fd != "" {
+		if folder, ok := grafana.Folders[fd]; ok {
+			folderid = folder
+			log.Println(fmt.Sprintf("foldername: %s", fd))
+			log.Println(fmt.Sprintf("Getting folder id : %d;folder name: %s;", folderid, fd))
+		}else{
+			log.Println(fmt.Sprintf("%s is not in foldernames", fd))
+		}
+	}
 
 	if isGrafanaDashboards || isGrafanaDatasource {
 		var err error
@@ -84,8 +97,9 @@ func (c *ConfigMapController) CreateDashboards(obj interface{}) {
 				log.Println(fmt.Sprintf("Creating datasource : %s;", k))
 				err = c.g.CreateDatasource(strings.NewReader(v))
 			} else {
+				value, _ := sjson.Set(v, "folderId", folderid)
 				log.Println(fmt.Sprintf("Creating dashboard : %s;", k))
-				err = c.g.CreateDashboard(strings.NewReader(v))
+				err = c.g.CreateDashboard(strings.NewReader(value))
 			}
 
 			if err != nil {
@@ -95,6 +109,7 @@ func (c *ConfigMapController) CreateDashboards(obj interface{}) {
 			}
 		}
 	} else {
-		log.Println(fmt.Sprintf("Skipping configmap: %s", configmapObj.Name))
+		//log.Println(fmt.Sprintf("Skipping configmap: %s", configmapObj.Name))
 	}
 }
+

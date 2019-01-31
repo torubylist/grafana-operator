@@ -16,6 +16,7 @@ import (
 
 var (
 	grafanaUrl        = flag.String("grafana-url", "", "The url to issue requests to update dashboards to.")
+	grafanaFolderName = flag.String("grafana-folder", "tos,tdh,tdc", "The url to issue requests to update dashboards to.")
 	runOutsideCluster = flag.Bool("run-outside-cluster", false, "Set this flag when running outside of the cluster.")
 )
 
@@ -44,7 +45,7 @@ func main() {
 		gUrl.User = url.UserPassword(os.Getenv("GRAFANA_USER"), os.Getenv("GRAFANA_PASSWORD"))
 	}
 
-	g := grafana.New(gUrl)
+	g := grafana.New(gUrl, *grafanaFolderName)
 
 	sigs := make(chan os.Signal, 1) // Create channel to receive OS signals
 	stop := make(chan struct{})     // Create channel to receive stop signal
@@ -59,7 +60,10 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-
+	err = g.SetFolders()
+	if err != nil {
+		log.Printf("can not get folders for %s, %s", *grafanaFolderName, err)
+	}
 	controller.NewConfigMapController(clientset, g).Run(stop, wg)
 
 	<-sigs // Wait for signals (this hangs until a signal arrives)
