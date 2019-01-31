@@ -128,7 +128,7 @@ func (c *APIClient)WaitForGrafanaUp() error {
 			return nil
 		} else {
 			log.Println("Trying Grafana Health again in 60s")
-			time.Sleep(60 * time.Second)
+			time.Sleep(10 * time.Second)
 		}
 	}
 	return errors.New("grafana is not ready")
