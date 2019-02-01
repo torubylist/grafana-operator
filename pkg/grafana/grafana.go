@@ -89,7 +89,7 @@ func (c *APIClient) DeleteDashboard(slug string) error {
 
 func (c *APIClient) CreateDashboard(dashboardJSON io.Reader) error {
 	log.Println(fmt.Sprintf("Failed to create %s, %s", c.BaseUrl, "/api/dashboards/db"))
-	return doPost(makeUrl(c.BaseUrl, "/api/dashboards/db"), dashboardJSON, c.HTTPClient)
+	return doPost(makeUrl(c.BaseUrl, "/api/dashboards/import"), dashboardJSON, c.HTTPClient)
 }
 
 func (c *APIClient) CreateDatasource(datasourceJSON io.Reader) error {
@@ -110,6 +110,20 @@ func doPost(url string, dataJSON io.Reader, c *http.Client) error {
 
 	return doRequest(c, req)
 }
+
+//func doPut(url string, dataJSON io.Reader, c *http.Client) error {
+//	req, err := http.NewRequest("PUT", url, dataJSON)
+//	if err != nil {
+//		return err
+//	}
+//	req.Header.Add("Content-Type", "application/json")
+//
+//	if os.Getenv("GRAFANA_BEARER_TOKEN") != "" {
+//		req.Header.Add("Authorization", "Bearer " + os.Getenv("GRAFANA_BEARER_TOKEN"))
+//	}
+//
+//	return doRequest(c, req)
+//}
 
 func (c *APIClient)WaitForGrafanaUp() error {
 	grafanaHealthUrl := fmt.Sprintf("%s/api/health", c.BaseUrl)
