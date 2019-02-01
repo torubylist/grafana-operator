@@ -88,7 +88,7 @@ func (c *APIClient) DeleteDashboard(slug string) error {
 }
 
 func (c *APIClient) CreateDashboard(dashboardJSON io.Reader) error {
-	log.Println(fmt.Sprintf("Failed to create %s, %s", c.BaseUrl, "/api/dashboards/db"))
+	log.Println(fmt.Sprintf("Failed to create %s, %s", c.BaseUrl, "/api/dashboards/import"))
 	return doPost(makeUrl(c.BaseUrl, "/api/dashboards/import"), dashboardJSON, c.HTTPClient)
 }
 
@@ -141,7 +141,7 @@ func (c *APIClient)WaitForGrafanaUp() error {
 		if grafanaUp {
 			return nil
 		} else {
-			log.Println("Trying Grafana Health again in 60s")
+			log.Println("Trying Grafana Health again in 10s")
 			time.Sleep(10 * time.Second)
 		}
 	}
