@@ -90,32 +90,15 @@ func (c *APIClient) DeleteDashboard(slug string) error {
 }
 
 func (c *APIClient) CreateDashboard(dashboardJSON io.Reader) error {
-	log.Println(fmt.Sprintf("creating to create %s, %s", c.BaseUrl, "/api/dashboards/import"))
+	log.Println(fmt.Sprintf("try to create %s, %s", c.BaseUrl, "/api/dashboards/import"))
 	return doPost(makeUrl(c.BaseUrl, "/api/dashboards/import"), dashboardJSON, c.HTTPClient)
-}
-
-func (c *APIClient) CreateFolder() error {
-	c.WaitForGrafanaUp()
-	log.Println(fmt.Sprintf("creating %s, %s, %s", c.BaseUrl, "/api/folders", c.FolderNames))
-	foldernames := strings.Split(c.FolderNames, ",")
-
-	for _, folder := range foldernames {
-		f := map[string]string{"title": folder}
-		fp, _ := json.Marshal(f)
-		log.Println(fmt.Sprintf("creating %s, %s, %s", c.BaseUrl, "/api/folders", fp))
-		err := doPost(makeUrl(c.BaseUrl, "/api/folders"), bytes.NewReader(fp), c.HTTPClient)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (c *APIClient) SetFolders() error {
 	err := c.CreateFolder()
 	//if err != nil {
 	//		return err
-	//	}
+	//}
 	log.Println(fmt.Sprintf("try to get folders %s, %s", c.BaseUrl, "/api/folders"))
 	folderUrl := makeUrl(c.BaseUrl, "/api/folders")
 	resp, err := c.HTTPClient.Get(folderUrl)
@@ -137,8 +120,26 @@ func (c *APIClient) SetFolders() error {
 	return nil
 }
 
+//create folder for grafana
+func (c *APIClient) CreateFolder() error {
+	c.WaitForGrafanaUp()
+	log.Println(fmt.Sprintf("creating %s, %s, %s", c.BaseUrl, "/api/folders", c.FolderNames))
+	foldernames := strings.Split(c.FolderNames, ",")
+
+	for _, folder := range foldernames {
+		f := map[string]string{"title": folder}
+		fp, _ := json.Marshal(f)
+		log.Println(fmt.Sprintf("creating %s, %s, %s", c.BaseUrl, "/api/folders", fp))
+		err := doPost(makeUrl(c.BaseUrl, "/api/folders"), bytes.NewReader(fp), c.HTTPClient)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (c *APIClient) CreateDatasource(datasourceJSON io.Reader) error {
-	log.Println(fmt.Sprintf("Failed to create %s, %s", c.BaseUrl, "/api/datasources"))
+	log.Println(fmt.Sprintf("try to create %s, %s", c.BaseUrl, "/api/datasources"))
 	return doPost(makeUrl(c.BaseUrl, "/api/datasources"), datasourceJSON, c.HTTPClient)
 }
 
@@ -155,6 +156,19 @@ func doPost(url string, dataJSON io.Reader, c *http.Client) error {
 
 	return doRequest(c, req)
 }
+
+func doRequest(c *http.Client, req *http.Request) error {
+	resp, err := c.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Unexpected status code returned from Grafana API (got: %d, expected: 200, msg:%s)", resp.StatusCode, resp.Status)
+	}
+	return nil
+}
+
 
 func (c *APIClient) WaitForGrafanaUp() error {
 	grafanaHealthUrl := fmt.Sprintf("%s/api/health", c.BaseUrl)
@@ -179,18 +193,6 @@ func (c *APIClient) WaitForGrafanaUp() error {
 	return errors.New("grafana is not ready")
 }
 
-func doRequest(c *http.Client, req *http.Request) error {
-	resp, err := c.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Unexpected status code returned from Grafana API (got: %d, expected: 200, msg:%s)", resp.StatusCode, resp.Status)
-	}
-	return nil
-}
-
 type Clientset struct {
 	BaseUrl    *url.URL
 	HTTPClient *http.Client
@@ -206,7 +208,6 @@ func New(baseUrl *url.URL, folderNames string) *APIClient {
 
 func makeUrl(baseURL *url.URL, endpoint string) string {
 	result := *baseURL
-
 	result.Path = path.Join(result.Path, endpoint)
 
 	return result.String()

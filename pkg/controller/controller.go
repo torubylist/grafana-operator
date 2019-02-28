@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
     "github.com/tidwall/sjson"
+	"crypto/sha1"
 )
 
 // ConfigMapController watches the kubernetes api for changes to configmaps and
@@ -24,6 +25,7 @@ type ConfigMapController struct {
 	configmapInformer cache.SharedIndexInformer
 	kclient           *kubernetes.Clientset
 	g                 grafana.APIInterface
+	hashes            map[string]bool
 }
 
 // Run starts the process for listening for configmap changes and acting upon those changes.
@@ -44,7 +46,7 @@ func (c *ConfigMapController) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 // NewConfigMapController creates a new NewConfigMapController
 func NewConfigMapController(kclient *kubernetes.Clientset, g grafana.APIInterface) *ConfigMapController {
-	configmapWatcher := &ConfigMapController{}
+	configmapWatcher := &ConfigMapController{hashes: make(map[string]bool)}
 
 	// Create informer for watching ConfigMaps
 	configmapInformer := cache.NewSharedIndexInformer(
@@ -74,6 +76,7 @@ func NewConfigMapController(kclient *kubernetes.Clientset, g grafana.APIInterfac
 
 func (c *ConfigMapController) CreateDashboards(obj interface{}) {
 	configmapObj := obj.(*v1.ConfigMap)
+
 	dh, _ := configmapObj.Annotations["grafana.net/dashboards"]
 	ds, _ := configmapObj.Annotations["grafana.net/datasource"]
 	fd, _ := configmapObj.Annotations["grafana.net/folder"]
@@ -93,6 +96,13 @@ func (c *ConfigMapController) CreateDashboards(obj interface{}) {
 	if isGrafanaDashboards || isGrafanaDatasource {
 		var err error
 		for k, v := range configmapObj.Data {
+			//check if the datasource/dashboards already posted.if true, skip, then post.
+			vSha := computeSha1(v)
+			if c.hashes[vSha] {
+				log.Println(fmt.Sprintf("dashboard already exist, %s skipped", k))
+				continue
+			}
+			c.hashes[vSha] = true
 			if isGrafanaDatasource {
 				log.Println(fmt.Sprintf("Creating datasource : %s;", k))
 				err = c.g.CreateDatasource(strings.NewReader(v))
@@ -109,7 +119,13 @@ func (c *ConfigMapController) CreateDashboards(obj interface{}) {
 			}
 		}
 	} else {
-		//log.Println(fmt.Sprintf("Skipping configmap: %s", configmapObj.Name))
+		log.Println(fmt.Sprintf("Skipping configmap: %s", configmapObj.Name))
 	}
 }
 
+func computeSha1(payload string) string {
+	hash := sha1.New()
+	hash.Write([]byte(payload))
+
+	return fmt.Sprintf("%x", hash.Sum(nil))
+}
