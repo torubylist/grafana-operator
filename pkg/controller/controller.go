@@ -76,16 +76,16 @@ func NewConfigMapController(kclient *kubernetes.Clientset, g grafana.APIInterfac
 
 func (c *ConfigMapController) CreateDashboards(obj interface{}) {
 	configmapObj := obj.(*v1.ConfigMap)
-
 	dh, _ := configmapObj.Annotations["grafana.net/dashboards"]
 	ds, _ := configmapObj.Annotations["grafana.net/datasource"]
 	fd, _ := configmapObj.Annotations["grafana.net/folder"]
+
 	isGrafanaDashboards, _ := strconv.ParseBool(dh)
 	isGrafanaDatasource, _ := strconv.ParseBool(ds)
 	var folderid int
 	if isGrafanaDashboards && fd != "" {
-		if folder, ok := grafana.Folders[fd]; ok {
-			folderid = folder
+		if id, ok := grafana.Folders[fd]; ok {
+			folderid = id
 			log.Println(fmt.Sprintf("foldername: %s", fd))
 			log.Println(fmt.Sprintf("Getting folder id : %d;folder name: %s;", folderid, fd))
 		}else{
@@ -111,7 +111,6 @@ func (c *ConfigMapController) CreateDashboards(obj interface{}) {
 				log.Println(fmt.Sprintf("Creating dashboard : %s;", k))
 				err = c.g.CreateDashboard(strings.NewReader(value))
 			}
-
 			if err != nil {
 				log.Println(fmt.Sprintf("Failed to create %s, %s", err, k))
 			} else {
@@ -119,7 +118,7 @@ func (c *ConfigMapController) CreateDashboards(obj interface{}) {
 			}
 		}
 	} else {
-		log.Println(fmt.Sprintf("Skipping configmap: %s", configmapObj.Name))
+		//log.Println(fmt.Sprintf("Skipping configmap: %s", configmapObj.Name))
 	}
 }
 

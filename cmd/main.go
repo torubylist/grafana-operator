@@ -17,6 +17,7 @@ import (
 var (
 	grafanaUrl        = flag.String("grafana-url", "", "The url to issue requests to update dashboards to.")
 	grafanaFolderName = flag.String("grafana-folder", "tos,tdh,tdc", "The url to issue requests to update dashboards to.")
+	grafanaHomePage = flag.String("grafana-homepage", "ji-qun-zong-lan", "set homepage.")
 	runOutsideCluster = flag.Bool("run-outside-cluster", false, "Set this flag when running outside of the cluster.")
 )
 
@@ -65,7 +66,10 @@ func main() {
 		log.Printf("can not get folders for %s, %s", *grafanaFolderName, err)
 	}
 	controller.NewConfigMapController(clientset, g).Run(stop, wg)
-
+	err = g.UpdateHomePage(*grafanaHomePage)
+	if err != nil {
+		log.Printf("can not set homepage to %s, %s", *grafanaHomePage, err)
+	}
 	<-sigs // Wait for signals (this hangs until a signal arrives)
 	log.Printf("Shutting down...")
 

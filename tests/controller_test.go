@@ -63,6 +63,11 @@ func (m *APIClientMock) SetFolders() error {
 	return nil
 }
 
+func (m *APIClientMock) UpdateHomePage(hp string) error {
+	m.Called()
+	return nil
+}
+
 func TestCreateDashboards(t *testing.T) {
 	apiClient := new(APIClientMock)
 	apiClient.On("CreateDashboard", strings.NewReader(dashboardJson)).Return(nil)

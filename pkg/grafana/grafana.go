@@ -35,6 +35,7 @@ type APIInterface interface {
 	DeleteDashboard(slug string) error
 	CreateDatasource(datasourceJson io.Reader) error
 	SetFolders() error
+	UpdateHomePage(hp string) error
 }
 
 type Folder struct {
@@ -52,7 +53,11 @@ type APIClient struct {
 type GrafanaDashboard struct {
 	Id    int    `json:"id"`
 	Title string `json:"title"`
-	Uri   string `json:"uri"`
+	Uri   string `json:"uri,omitempty"`
+}
+
+type DashboardSpec struct {
+	Dashboard GrafanaDashboard `json:"dashboard"`
 }
 
 var Folders map[string]int
@@ -91,9 +96,10 @@ func (c *APIClient) DeleteDashboard(slug string) error {
 
 func (c *APIClient) CreateDashboard(dashboardJSON io.Reader) error {
 	log.Println(fmt.Sprintf("try to create %s, %s", c.BaseUrl, "/api/dashboards/import"))
-	return doPost(makeUrl(c.BaseUrl, "/api/dashboards/import"), dashboardJSON, c.HTTPClient)
+	return doRestApis("Post", makeUrl(c.BaseUrl, "/api/dashboards/import"), dashboardJSON, c.HTTPClient)
 }
 
+//create folder map
 func (c *APIClient) SetFolders() error {
 	err := c.CreateFolder()
 	//if err != nil {
@@ -120,17 +126,18 @@ func (c *APIClient) SetFolders() error {
 	return nil
 }
 
-//create folder for grafana
+//create folders for grafana
 func (c *APIClient) CreateFolder() error {
 	c.WaitForGrafanaUp()
-	log.Println(fmt.Sprintf("creating %s, %s, %s", c.BaseUrl, "/api/folders", c.FolderNames))
+	log.Printf("creating %s, %s, %s\n", c.BaseUrl, "/api/folders", c.FolderNames)
 	foldernames := strings.Split(c.FolderNames, ",")
 
 	for _, folder := range foldernames {
 		f := map[string]string{"title": folder}
 		fp, _ := json.Marshal(f)
 		log.Println(fmt.Sprintf("creating %s, %s, %s", c.BaseUrl, "/api/folders", fp))
-		err := doPost(makeUrl(c.BaseUrl, "/api/folders"), bytes.NewReader(fp), c.HTTPClient)
+		folderUrl := makeUrl(c.BaseUrl, "/api/folders")
+		err := doRestApis("POST", folderUrl, bytes.NewReader(fp), c.HTTPClient)
 		if err != nil {
 			return err
 		}
@@ -139,12 +146,131 @@ func (c *APIClient) CreateFolder() error {
 }
 
 func (c *APIClient) CreateDatasource(datasourceJSON io.Reader) error {
-	log.Println(fmt.Sprintf("try to create %s, %s", c.BaseUrl, "/api/datasources"))
-	return doPost(makeUrl(c.BaseUrl, "/api/datasources"), datasourceJSON, c.HTTPClient)
+	log.Printf("try to create %s, %s\n", c.BaseUrl, "/api/datasources")
+	datasourceUrl := makeUrl(c.BaseUrl, "/api/datasources")
+	return doRestApis("POST", datasourceUrl, datasourceJSON, c.HTTPClient)
 }
 
-func doPost(url string, dataJSON io.Reader, c *http.Client) error {
-	req, err := http.NewRequest("POST", url, dataJSON)
+//set home page to specific dashboard.
+func (c *APIClient) UpdateHomePage(hp string) error {
+	log.Printf("try to set homepage to  %s\n", hp)
+
+	//get specific dashboard id
+	slugUrl := makeUrl(c.BaseUrl, fmt.Sprintf("%s%s","/api/dashboards/db/", hp))
+	dbid, err := getDashboardId(slugUrl)
+	if err != nil {
+		log.Printf("Get dashboardid %s failed %s \n.", hp, err)
+		return err
+	}
+
+	//star the dashboard.
+	starUrl := makeUrl(c.BaseUrl, fmt.Sprintf("%s/%d", "/api/usr/stars/dashboard", dbid))
+	err = starDashboard(starUrl, c.HTTPClient)
+	if err != nil {
+		log.Printf("Star dashboard %d failed %s \n.", dbid, err)
+		return err
+	}
+
+	//update preference home page to hp
+	prefUrl := makeUrl(c.BaseUrl,"/api/org/preferences")
+	err = c.updateHomeDashboard(prefUrl, dbid, c.HTTPClient)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Set homepage to dashboard %s done.", hp)
+	return nil
+}
+
+func getDashboardId(dashboardSlugUrl string) (int,error) {
+	log.Printf("try to dashboard id from %s\n", dashboardSlugUrl)
+	var id int
+	var err error
+	for i:=0;i<10;i++{
+		time.Sleep(5*time.Second)
+		id,err = func () (int, error) {
+			resp, err := http.Get(dashboardSlugUrl)
+			if resp.StatusCode != http.StatusOK {
+				return -1, errors.New(fmt.Sprintf("Wrong http response status %d", resp.StatusCode))
+			}
+			defer resp.Body.Close()
+
+			var dashboard DashboardSpec
+			err = json.NewDecoder(resp.Body).Decode(&dashboard)
+			log.Printf("dashboard: %v\n", dashboard)
+			if err != nil {
+				log.Printf("json decode failed. %s", err)
+				return -1, err
+			}
+
+			return dashboard.Dashboard.Id, nil
+		}()
+		if id != -1 {
+			log.Printf("Already get dashboard id: %d", id)
+			break
+		}
+	}
+	return id, err
+}
+
+func starDashboard(starUrl string, hClient *http.Client) error {
+	log.Printf("try to star dashboard url: %s\n", starUrl)
+	err := doRestApis("POST", starUrl, nil, hClient)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *APIClient)updateHomeDashboard(url string, dashboardId int, hClient *http.Client) error {
+	pref := map[string]int{"homeDashboardId": dashboardId}
+	prefjson, err := json.Marshal(pref)
+	if err != nil {
+		log.Printf("json marshal failed. %s", err)
+		return err
+	}
+	log.Println(fmt.Sprintf("Updating preferences %s,%s", url, prefjson))
+	err = doRestApis("PUT", url, bytes.NewReader(prefjson), hClient)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Changed home page to dashboardid %d", dashboardId)
+	return nil
+}
+
+func (c *APIClient) WaitForGrafanaUp() error {
+	grafanaHealthUrl := fmt.Sprintf("%s/api/health", c.BaseUrl)
+	for i:=0;i<20;i++ {
+		err := func() error {
+			resp, err := http.Get(grafanaHealthUrl)
+			grafanaUp := false
+			if err != nil {
+				log.Printf("Failed to request Grafana Health: %s", err)
+			} else if resp.StatusCode != 200 {
+				log.Printf("Grafana Health returned with %d", resp.StatusCode)
+			} else {
+				grafanaUp = true
+			}
+
+			defer resp.Body.Close()
+
+			if grafanaUp {
+				return nil
+			} else {
+				log.Println("Trying Grafana Health again in 5s")
+				time.Sleep(5 * time.Second)
+			}
+			return errors.New("grafana not ready, retry later")
+		}()
+		if err == nil {
+			log.Println("Grafana is ready")
+			break
+		}
+	}
+	return errors.New("grafana is not ready, please check")
+}
+
+func doRestApis(action, url string, dataJSON io.Reader, hClient *http.Client) error {
+	req, err := http.NewRequest(action, url, dataJSON)
 	if err != nil {
 		return err
 	}
@@ -154,11 +280,11 @@ func doPost(url string, dataJSON io.Reader, c *http.Client) error {
 		req.Header.Add("Authorization", "Bearer "+os.Getenv("GRAFANA_BEARER_TOKEN"))
 	}
 
-	return doRequest(c, req)
+	return doRequest(hClient, req)
 }
 
-func doRequest(c *http.Client, req *http.Request) error {
-	resp, err := c.Do(req)
+func doRequest(hClient *http.Client, req *http.Request) error {
+	resp, err := hClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -167,30 +293,6 @@ func doRequest(c *http.Client, req *http.Request) error {
 		return fmt.Errorf("Unexpected status code returned from Grafana API (got: %d, expected: 200, msg:%s)", resp.StatusCode, resp.Status)
 	}
 	return nil
-}
-
-
-func (c *APIClient) WaitForGrafanaUp() error {
-	grafanaHealthUrl := fmt.Sprintf("%s/api/health", c.BaseUrl)
-	for {
-		resp, err := http.Get(grafanaHealthUrl)
-		grafanaUp := false
-		if err != nil {
-			log.Printf("Failed to request Grafana Health: %s", err)
-		} else if resp.StatusCode != 200 {
-			log.Printf("Grafana Health returned with %d", resp.StatusCode)
-		} else {
-			grafanaUp = true
-		}
-
-		if grafanaUp {
-			return nil
-		} else {
-			log.Println("Trying Grafana Health again in 10s")
-			time.Sleep(10 * time.Second)
-		}
-	}
-	return errors.New("grafana is not ready")
 }
 
 type Clientset struct {
