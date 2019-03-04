@@ -19,7 +19,7 @@ node('tos-builder') {
     withEnv([
             'DOCKER_HOST=unix:///var/run/docker.sock',
             'DOCKER_REPO=172.16.1.99',
-            'COMPONENT_NAME=grafana-dashboard-operator',
+            'COMPONENT_NAME=grafana-dashboard-watcher',
             'DOCKER_PROD_NS=gold',
     ]) {
 
@@ -42,7 +42,7 @@ node('tos-builder') {
                         mkdir -p $GOPATH/src/github.com/tsloughter/grafana-operator
                         cp -r . $GOPATH/src/github.com/tsloughter/grafana-operator
                         cd $GOPATH/src/github.com/tsloughter/grafana-operator
-                        CGO_ENABLED=0  go build -v -i -o ./bin/grafana-dashboard-operator ./cmd
+                        CGO_ENABLED=0  go build -v -i -o ./bin/grafana-dashboard-watcher ./cmd
                     """
                 }
                 stage('ci build') {
