@@ -65,11 +65,19 @@ func main() {
 	if err != nil {
 		log.Printf("can not get folders for %s, %s", *grafanaFolderName, err)
 	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := g.UpdateHomePage(*grafanaHomePage)
+		if err != nil {
+			log.Printf("Can not set homepage to %s, %s", *grafanaHomePage, err)
+		}else{
+			log.Printf("Set homepage to %s success!\n", *grafanaHomePage)
+
+		}
+	}()
 	controller.NewConfigMapController(clientset, g).Run(stop, wg)
-	err = g.UpdateHomePage(*grafanaHomePage)
-	if err != nil {
-		log.Printf("can not set homepage to %s, %s", *grafanaHomePage, err)
-	}
+
 	<-sigs // Wait for signals (this hangs until a signal arrives)
 	log.Printf("Shutting down...")
 

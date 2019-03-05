@@ -27,6 +27,7 @@ import (
 	"path"
 	"strings"
 	"time"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 type APIInterface interface {
@@ -95,8 +96,9 @@ func (c *APIClient) DeleteDashboard(slug string) error {
 }
 
 func (c *APIClient) CreateDashboard(dashboardJSON io.Reader) error {
-	log.Println(fmt.Sprintf("try to create %s, %s", c.BaseUrl, "/api/dashboards/import"))
-	return doRestApis("Post", makeUrl(c.BaseUrl, "/api/dashboards/import"), dashboardJSON, c.HTTPClient)
+	url := makeUrl(c.BaseUrl, "/api/dashboards/import")
+	log.Printf("try to create dashboard %s", url)
+	return doRestApis("POST", url, dashboardJSON, c.HTTPClient)
 }
 
 //create folder map
@@ -157,6 +159,7 @@ func (c *APIClient) UpdateHomePage(hp string) error {
 
 	//get specific dashboard id
 	slugUrl := makeUrl(c.BaseUrl, fmt.Sprintf("%s%s","/api/dashboards/db/", hp))
+	log.Printf("homepage url %s\n", slugUrl)
 	dbid, err := getDashboardId(slugUrl)
 	if err != nil {
 		log.Printf("Get dashboardid %s failed %s \n.", hp, err)
@@ -164,7 +167,7 @@ func (c *APIClient) UpdateHomePage(hp string) error {
 	}
 
 	//star the dashboard.
-	starUrl := makeUrl(c.BaseUrl, fmt.Sprintf("%s/%d", "/api/usr/stars/dashboard", dbid))
+	starUrl := makeUrl(c.BaseUrl, fmt.Sprintf("%s/%d", "/api/user/stars/dashboard", dbid))
 	err = starDashboard(starUrl, c.HTTPClient)
 	if err != nil {
 		log.Printf("Star dashboard %d failed %s \n.", dbid, err)
@@ -177,7 +180,7 @@ func (c *APIClient) UpdateHomePage(hp string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Set homepage to dashboard %s done.", hp)
+	fmt.Printf("Set homepage to dashboard %s done\n", hp)
 	return nil
 }
 
@@ -186,7 +189,7 @@ func getDashboardId(dashboardSlugUrl string) (int,error) {
 	var id int
 	var err error
 	for i:=0;i<10;i++{
-		time.Sleep(5*time.Second)
+		time.Sleep(6*time.Second)
 		id,err = func () (int, error) {
 			resp, err := http.Get(dashboardSlugUrl)
 			if resp.StatusCode != http.StatusOK {
@@ -233,43 +236,37 @@ func (c *APIClient)updateHomeDashboard(url string, dashboardId int, hClient *htt
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Changed home page to dashboardid %d", dashboardId)
+	fmt.Printf("Changed home page to dashboardid %d\n", dashboardId)
 	return nil
 }
 
 func (c *APIClient) WaitForGrafanaUp() error {
 	grafanaHealthUrl := fmt.Sprintf("%s/api/health", c.BaseUrl)
-	for i:=0;i<20;i++ {
-		err := func() error {
-			resp, err := http.Get(grafanaHealthUrl)
-			grafanaUp := false
-			if err != nil {
-				log.Printf("Failed to request Grafana Health: %s", err)
-			} else if resp.StatusCode != 200 {
-				log.Printf("Grafana Health returned with %d", resp.StatusCode)
-			} else {
-				grafanaUp = true
-			}
-
-			defer resp.Body.Close()
-
-			if grafanaUp {
-				return nil
-			} else {
-				log.Println("Trying Grafana Health again in 5s")
-				time.Sleep(5 * time.Second)
-			}
-			return errors.New("grafana not ready, retry later")
-		}()
-		if err == nil {
-			log.Println("Grafana is ready")
-			break
+	err := wait.Poll(3*time.Second, 10*time.Minute, func() (bool,error) {
+		resp, err := http.Get(grafanaHealthUrl)
+		grafanaUp := false
+		if err != nil {
+			log.Printf("Failed to request Grafana Health: %s\n", err)
+		} else if resp.StatusCode != 200 {
+			log.Printf("Grafana Health returned with %d\n", resp.StatusCode)
+		} else {
+			grafanaUp = true
 		}
-	}
-	return errors.New("grafana is not ready, please check")
+
+		defer resp.Body.Close()
+
+		if grafanaUp {
+			return true, nil
+		} else {
+			log.Println("Trying Grafana Health again in 3s")
+			return false, errors.New("grafana not ready, retry later")
+		}
+	})
+	return err
 }
 
 func doRestApis(action, url string, dataJSON io.Reader, hClient *http.Client) error {
+	log.Println(action, url)
 	req, err := http.NewRequest(action, url, dataJSON)
 	if err != nil {
 		return err

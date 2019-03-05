@@ -104,17 +104,17 @@ func (c *ConfigMapController) CreateDashboards(obj interface{}) {
 			}
 			c.hashes[vSha] = true
 			if isGrafanaDatasource {
-				log.Println(fmt.Sprintf("Creating datasource : %s;", k))
+				log.Printf("Creating datasource : %s;", k)
 				err = c.g.CreateDatasource(strings.NewReader(v))
 			} else {
 				value, _ := sjson.Set(v, "folderId", folderid)
-				log.Println(fmt.Sprintf("Creating dashboard : %s;", k))
+				log.Printf("Creating dashboard : %s;folder id %d", k, folderid)
 				err = c.g.CreateDashboard(strings.NewReader(value))
 			}
 			if err != nil {
-				log.Println(fmt.Sprintf("Failed to create %s, %s", err, k))
+				log.Printf("Failed to create %s, %s", err, k)
 			} else {
-				log.Println(fmt.Sprintf("Created %s", k))
+				log.Printf("Created %s", k)
 			}
 		}
 	} else {
