@@ -192,11 +192,15 @@ func getDashboardId(dashboardSlugUrl string) (int,error) {
 		time.Sleep(6*time.Second)
 		id,err = func () (int, error) {
 			resp, err := http.Get(dashboardSlugUrl)
-			if resp.StatusCode != http.StatusOK {
+			if err != nil {
+				log.Printf("get dashboardid failed: %s\n", err)
+				return -1, err
+			}else if resp.StatusCode != http.StatusOK {
 				return -1, errors.New(fmt.Sprintf("Wrong http response status %d", resp.StatusCode))
+			}else {
+				log.Println("get dashboard page success,then decode resp.body")
 			}
 			defer resp.Body.Close()
-
 			var dashboard DashboardSpec
 			err = json.NewDecoder(resp.Body).Decode(&dashboard)
 			log.Printf("dashboard: %v\n", dashboard)
@@ -247,12 +251,12 @@ func (c *APIClient) WaitForGrafanaUp() error {
 		grafanaUp := false
 		if err != nil {
 			log.Printf("Failed to request Grafana Health: %s\n", err)
+			return false, err
 		} else if resp.StatusCode != 200 {
 			log.Printf("Grafana Health returned with %d\n", resp.StatusCode)
 		} else {
 			grafanaUp = true
 		}
-
 		defer resp.Body.Close()
 
 		if grafanaUp {
