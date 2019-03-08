@@ -27,7 +27,6 @@ import (
 	"path"
 	"strings"
 	"time"
-	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 type APIInterface interface {
@@ -37,6 +36,7 @@ type APIInterface interface {
 	CreateDatasource(datasourceJson io.Reader) error
 	SetFolders() error
 	UpdateHomePage(hp string) error
+	GetNamespace() string
 }
 
 type Folder struct {
@@ -48,6 +48,7 @@ type Folder struct {
 type APIClient struct {
 	BaseUrl     *url.URL
 	FolderNames string
+	Namespace string
 	HTTPClient  *http.Client
 }
 
@@ -153,6 +154,10 @@ func (c *APIClient) CreateDatasource(datasourceJSON io.Reader) error {
 	return doRestApis("POST", datasourceUrl, datasourceJSON, c.HTTPClient)
 }
 
+func (c *APIClient)GetNamespace() string  {
+	return c.Namespace
+}
+
 //set home page to specific dashboard.
 func (c *APIClient) UpdateHomePage(hp string) error {
 	log.Printf("try to set homepage to  %s\n", hp)
@@ -246,26 +251,34 @@ func (c *APIClient)updateHomeDashboard(url string, dashboardId int, hClient *htt
 
 func (c *APIClient) WaitForGrafanaUp() error {
 	grafanaHealthUrl := fmt.Sprintf("%s/api/health", c.BaseUrl)
-	err := wait.Poll(3*time.Second, 10*time.Minute, func() (bool,error) {
-		resp, err := http.Get(grafanaHealthUrl)
-		grafanaUp := false
-		if err != nil {
-			log.Printf("Failed to request Grafana Health: %s\n", err)
-			return false, err
-		} else if resp.StatusCode != 200 {
-			log.Printf("Grafana Health returned with %d\n", resp.StatusCode)
-		} else {
-			grafanaUp = true
-		}
-		defer resp.Body.Close()
+	var err error
+	var grafanaStatus bool
+	for i:=0;i<10;i++{
+		time.Sleep(6*time.Second)
+		grafanaStatus, err = func() (bool,error) {
+			resp, err := http.Get(grafanaHealthUrl)
+			grafanaUp := false
+			if err != nil {
+				log.Printf("Failed to request Grafana Health: %s\n", err)
+				return false, err
+			} else if resp.StatusCode != 200 {
+				log.Printf("Grafana Health returned with %d\n", resp.StatusCode)
+			} else {
+				grafanaUp = true
+			}
+			defer resp.Body.Close()
 
-		if grafanaUp {
-			return true, nil
-		} else {
-			log.Println("Trying Grafana Health again in 3s")
-			return false, errors.New("grafana not ready, retry later")
+			if grafanaUp {
+				return true, nil
+			} else {
+				log.Println("Trying Grafana Health again in 3s")
+				return false, errors.New("grafana not ready, retry later")
+			}
+		}()
+		if grafanaStatus == true {
+			break
 		}
-	})
+	}
 	return err
 }
 
@@ -301,10 +314,11 @@ type Clientset struct {
 	HTTPClient *http.Client
 }
 
-func New(baseUrl *url.URL, folderNames string) *APIClient {
+func New(baseUrl *url.URL, folderNames, namespace string) *APIClient {
 	return &APIClient{
 		BaseUrl:     baseUrl,
 		FolderNames: folderNames,
+		Namespace: namespace,
 		HTTPClient:  http.DefaultClient,
 	}
 }

@@ -47,15 +47,16 @@ func (c *ConfigMapController) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 // NewConfigMapController creates a new NewConfigMapController
 func NewConfigMapController(kclient *kubernetes.Clientset, g grafana.APIInterface) *ConfigMapController {
 	configmapWatcher := &ConfigMapController{hashes: make(map[string]bool)}
-
 	// Create informer for watching ConfigMaps
+	ns := g.GetNamespace()
+	log.Println("configmap namespace: ", ns)
 	configmapInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return kclient.Core().ConfigMaps(metav1.NamespaceAll).List(options)
+				return kclient.Core().ConfigMaps(ns).List(options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return kclient.Core().ConfigMaps(metav1.NamespaceAll).Watch(options)
+				return kclient.Core().ConfigMaps(ns).Watch(options)
 			},
 		},
 		&v1.ConfigMap{},
