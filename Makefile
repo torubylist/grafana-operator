@@ -1,4 +1,4 @@
-OPERATOR_NAME  := grafana-operator
+OPERATOR_NAME  := grafana-dashboard-watcher
 VERSION := $(shell date +%Y%m%d%H%M)
 ACCOUNT := tsloughter
 IMAGE := $(ACCOUNT)/$(OPERATOR_NAME)

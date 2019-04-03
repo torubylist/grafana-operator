@@ -14,8 +14,13 @@ import (
 	"github.com/tsloughter/grafana-operator/pkg/kubernetes"
 )
 
+const allNamespace = ""
+
 var (
 	grafanaUrl        = flag.String("grafana-url", "", "The url to issue requests to update dashboards to.")
+	grafanaFolderName = flag.String("grafana-folder", "tos,tdh,tdc", "The url to issue requests to update dashboards to.")
+	grafanaHomePage   = flag.String("grafana-homepage", "ji-qun-zong-lan", "set homepage.")
+	grafanaNamespace   = flag.String("grafana-namespace", "all", "set namespace.")
 	runOutsideCluster = flag.Bool("run-outside-cluster", false, "Set this flag when running outside of the cluster.")
 )
 
@@ -43,7 +48,12 @@ func main() {
 	if os.Getenv("GRAFANA_USER") != "" && os.Getenv("GRAFANA_PASSWORD") != "" {
 		gUrl.User = url.UserPassword(os.Getenv("GRAFANA_USER"), os.Getenv("GRAFANA_PASSWORD"))
 	}
-	g := grafana.New(gUrl)
+
+	if *grafanaNamespace == "all" {
+		*grafanaNamespace = allNamespace
+	}
+
+	g := grafana.New(gUrl, *grafanaFolderName, *grafanaNamespace)
 
 	sigs := make(chan os.Signal, 1) // Create channel to receive OS signals
 	stop := make(chan struct{})     // Create channel to receive stop signal
@@ -58,7 +68,20 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-
+	err = g.SetFolders()
+	if err != nil {
+		log.Printf("can not get folders for %s, %s", *grafanaFolderName, err)
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := g.UpdateHomePage(*grafanaHomePage)
+		if err != nil {
+			log.Printf("Can not set homepage to %s, %s", *grafanaHomePage, err)
+		}else{
+			log.Printf("Set homepage to %s success!\n", *grafanaHomePage)
+		}
+	}()
 	controller.NewConfigMapController(clientset, g).Run(stop, wg)
 
 	<-sigs // Wait for signals (this hangs until a signal arrives)

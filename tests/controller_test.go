@@ -19,7 +19,8 @@ const dashboardJson = `
 	"dashboard": {
 		"description": "Dashboard to get an overview of one server",
 		"editable": true,
-	}
+	},
+	"folderId": 0
 }
 `
 const datasourceJson = `
@@ -54,6 +55,16 @@ func (m *APIClientMock) SearchDashboard() ([]grafana.GrafanaDashboard, error) {
 
 func (m *APIClientMock) CreateDatasource(datasourceJson io.Reader) error {
 	m.Called(datasourceJson)
+	return nil
+}
+
+func (m *APIClientMock) SetFolders() error {
+	m.Called()
+	return nil
+}
+
+func (m *APIClientMock) UpdateHomePage(hp string) error {
+	m.Called()
 	return nil
 }
 
