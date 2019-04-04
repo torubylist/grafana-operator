@@ -76,7 +76,6 @@ func NewConfigMapController(kclient *kubernetes.Clientset, g grafana.APIInterfac
 }
 
 func (c *ConfigMapController) CreateDashboards(obj interface{}) {
-	c.g.WaitForGrafanaUp()
 	configmapObj := obj.(*v1.ConfigMap)
 	dh, _ := configmapObj.Annotations["grafana.net/dashboards"]
 	ds, _ := configmapObj.Annotations["grafana.net/datasource"]
