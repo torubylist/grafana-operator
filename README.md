@@ -8,6 +8,7 @@ Currently it simply watches for new `ConfigMaps` and if they define the annotati
 
 Additionally, if the `ConfigMaps` define the annotation `grafana.net/datasource` as `"true"` it will `POST` each daatsource from the `ConfigMap` to Grafana. This requires Grafana 5.x.
 
+You can set folder name of grafana and homepage of grafana, and filter configmaps by namespace.
 ## Usage
 ```
 --run-outside-cluster # Uses ~/.kube/config rather than in cluster configuration
@@ -19,7 +20,9 @@ Additionally, if the `ConfigMaps` define the annotation `grafana.net/datasource`
 ### Build from source
 1. `make install_deps`
 2. `make build`
-3. `./bin/grafana-operator --run-outside-cluster 1 --grafana-url <GRAFANA URL>`
+3. `./bin/grafana-dashboard-watcher --run-outside-cluster 1 --grafana-url <GRAFANA URL> 
+--grafana-namespace <GRAFANA-NAMESPACE> --grafana-folder <FOLDER-NAME> 
+--grafana-homepage <HOMEPAGE>`
 
 Easiest way to install just Grafana to Kubernetes for playing with helm: `helm install stable/grafana` then add the dashboards, `kubectl apply -f examples/grafana-dashboards.yaml`
 
